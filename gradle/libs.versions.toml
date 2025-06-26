@@ -1,0 +1,27 @@
+[versions]
+activityCompose = "1.10.1"
+decompose = "3.3.0"
+evaIcons = "1.1.1"
+extensionsComposeJetbrainsVersion = "3.3.0"
+firebaseAuth = "2.1.0"
+firebaseFirestore = "2.1.0"
+kmpnotifier = "1.5.1"
+koalaplotCore = "0.8.0"
+kotlinxCoroutinesCore = "1.10.2"
+kotlinxDatetime = "0.6.2"
+kotlinxSerializationJson = "1.8.1"
+
+[libraries]
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+decompose = { module = "com.arkivanov.decompose:decompose", version.ref = "decompose" }
+decompose-jetbrains = { module = "com.arkivanov.decompose:extensions-compose", version.ref = "extensionsComposeJetbrainsVersion" }
+eva-icons = { module = "br.com.devsrsouza.compose.icons:eva-icons", version.ref = "evaIcons" }
+firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "firebaseAuth" }
+firebase-firestore = { module = "dev.gitlive:firebase-firestore", version.ref = "firebaseFirestore" }
+kmpnotifier = { module = "io.github.mirzemehdi:kmpnotifier", version.ref = "kmpnotifier" }
+koalaplot-core = { module = "io.github.koalaplot:koalaplot-core", version.ref = "koalaplotCore" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+maplibre-compose = { module = "dev.sargunv.maplibre-compose:maplibre-compose", version = "0.9.1" }
+[plugins]
