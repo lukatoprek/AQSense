@@ -5,11 +5,11 @@ import com.mmk.kmpnotifier.notification.NotifierManager
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.CalculateAqiDialogComponent
 import hr.ferit.ltoprek.aqsense.models.Sensor
 import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator
+import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.AqiRisk
+import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.AqiRiskWarning
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.math.roundToInt
 import kotlin.random.Random
-import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.aqiRiskWarning
-import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.AqiRisk
 
 class RealCalculateAqiDialogComponent(
     componentContext: ComponentContext,
@@ -22,6 +22,12 @@ class RealCalculateAqiDialogComponent(
 
     override val calculatedAqi = MutableStateFlow<Double?>(null)
 
+    override val isDateRangeCalculationModeSet = MutableStateFlow(false)
+
+    override fun setDateRangeCalculationMode() { isDateRangeCalculationModeSet.value = true }
+
+    override fun resetDateRangeCalculationMode() { isDateRangeCalculationModeSet.value = false }
+
     override fun onSelectedSensorsChanged(sensors: List<Sensor>) { selectedSensors.value = sensors }
 
     override fun onCalculateAqiClicked() {
@@ -32,14 +38,14 @@ class RealCalculateAqiDialogComponent(
             return
         }
 
-        val aqi = AqiCalculator.calculateAqi(selectedSensors.value)
+        val aqi = AqiCalculator.calculateAqi(selectedSensors.value, isDateRangeCalculationModeSet.value)
         calculatedAqi.value = aqi
 
         val aqiRisk = AqiCalculator.checkAqiRisk(aqi)
         val riskWarning = when (aqiRisk) {
-            AqiRisk.GOOD -> aqiRiskWarning.good
-            AqiRisk.MODERATE -> aqiRiskWarning.moderate
-            AqiRisk.UNHEALTHY -> aqiRiskWarning.unhealthy
+            AqiRisk.GOOD -> AqiRiskWarning.GOOD
+            AqiRisk.MODERATE -> AqiRiskWarning.MODERATE
+            AqiRisk.UNHEALTHY -> AqiRiskWarning.UNHEALTHY
         }
 
 

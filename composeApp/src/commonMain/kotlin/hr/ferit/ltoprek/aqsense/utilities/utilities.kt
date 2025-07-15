@@ -24,20 +24,30 @@ object AqiCalculator
     private const val VOC_MAX = 1000
     private const val PRIMARY_POLLUTANT_WEIGHT = 0.5
 
-    private fun getAverageMeasurement(sensors: List<Sensor>, targetType: SensorType): Double? {
+    private fun getAverageMeasurement(sensors: List<Sensor>, targetType: SensorType, isDateRangeCalculationModeSet: Boolean): Double?
+    {
         val relevantSensors = sensors.filter { it.type == targetType }
-        if (relevantSensors.isEmpty()) return null
-        return relevantSensors.map { it.measurements.lastOrNull()?.value ?: 0.0 }.average() // Handle empty measurements
+        if(isDateRangeCalculationModeSet)
+        {
+            if (relevantSensors.isEmpty()) return null
+            val allMeasurements = relevantSensors.flatMap { it.measurements.map { m -> m.value } }
+            return if (allMeasurements.isNotEmpty()) allMeasurements.average() else null
+        }
+        else
+        {
+            if (relevantSensors.isEmpty()) return null
+            return relevantSensors.map { it.measurements.lastOrNull()?.value ?: 0.0 }.average()
+        }
     }
 
-    fun calculateAqi(sensors: List<Sensor>): Double {
+    fun calculateAqi(sensors: List<Sensor>, isDateRangeCalculationModeSet: Boolean): Double {
         if (sensors.isEmpty()) {
             throw IllegalArgumentException("Cannot calculate AQI with an empty list of sensors.")
         }
 
-        val avgCO = getAverageMeasurement(sensors, SensorType.CO)
-        val avgVOC = getAverageMeasurement(sensors, SensorType.VOC)
-        val avgCO2 = getAverageMeasurement(sensors, SensorType.CO2)
+        val avgCO = getAverageMeasurement(sensors, SensorType.CO, isDateRangeCalculationModeSet)
+        val avgVOC = getAverageMeasurement(sensors, SensorType.VOC, isDateRangeCalculationModeSet)
+        val avgCO2 = getAverageMeasurement(sensors, SensorType.CO2, isDateRangeCalculationModeSet)
 
         val coIndex = avgCO?.let { calculateCOIndex(it) }
         val vocIndex = avgVOC?.let { calculateVOCIndex(it) }
@@ -85,10 +95,10 @@ object AqiCalculator
         UNHEALTHY,
     }
 
-    object aqiRiskWarning{
-        val good = "Air quality is satisfactory, and air pollution poses little or no risk."
-        val moderate = "Members of sensitive groups may experience health effects and should limit or avoid outdoor activities."
-        val unhealthy = "Health alert! The risk of health effects is increased and everyone should avoid all outdoor activities."
+    object AqiRiskWarning{
+        const val GOOD = "Air quality is satisfactory, and air pollution poses little or no risk."
+        const val MODERATE = "Members of sensitive groups may experience health effects and should limit or avoid outdoor activities."
+        const val UNHEALTHY = "Health alert! The risk of health effects is increased and everyone should avoid all outdoor activities."
     }
 
     fun checkAqiRisk(aqi: Double): AqiRisk{

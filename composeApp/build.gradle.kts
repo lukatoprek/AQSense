@@ -41,6 +41,7 @@ kotlin {
                 implementation(libs.firebase.auth)
                 implementation(libs.maplibre.compose)
                 implementation(libs.eva.icons)
+                implementation(libs.datetime.wheel.picker)
                 api(libs.kmpnotifier)
             }
         }

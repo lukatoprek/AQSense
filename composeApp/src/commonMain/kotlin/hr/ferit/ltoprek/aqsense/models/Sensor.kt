@@ -3,6 +3,7 @@ package hr.ferit.ltoprek.aqsense.models
 import dev.gitlive.firebase.firestore.GeoPoint
 import hr.ferit.ltoprek.aqsense.utilities.MeasurementTimestamp
 import io.github.koalaplot.core.xygraph.Point
+import io.github.koalaplot.core.xygraph.autoScaleRange
 import kotlinx.datetime.Instant
 
 enum class SensorType(rawValue:Long)
@@ -43,7 +44,7 @@ data class Sensor(
     val coordinates: GeoPoint? = GeoPoint(0.0,0.0)
 ){
     fun getLatestMeasurement(): String{
-        return "${measurements.last().value} $unitOfMeasurement"
+        return "${measurements.lastOrNull()?.value} $unitOfMeasurement"
     }
 
     fun getSensorTimes(): List<Instant>
@@ -60,9 +61,7 @@ data class Sensor(
 
     fun getSensorValueRange(): ClosedFloatingPointRange<Double> {
         val values = getSensorValues()
-        val min = values.minOrNull() ?: 0.0
-        val max = values.maxOrNull() ?: 0.0
-        return min..max
+        return values.autoScaleRange()
     }
 
     fun getMeasurementPointList(): List<Point<Instant, Double>>

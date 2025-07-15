@@ -11,6 +11,12 @@ interface CalculateAqiDialogComponent
 
     val calculatedAqi: StateFlow<Double?>
 
+    val isDateRangeCalculationModeSet: StateFlow<Boolean>
+
+    fun setDateRangeCalculationMode()
+
+    fun resetDateRangeCalculationMode()
+
     fun onSelectedSensorsChanged(sensors: List<Sensor>)
 
     fun onCalculateAqiClicked()

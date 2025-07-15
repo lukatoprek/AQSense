@@ -2,6 +2,7 @@ package hr.ferit.ltoprek.aqsense.components.ui.main
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -37,13 +40,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,9 +73,14 @@ import compose.icons.evaicons.outline.Percent
 import compose.icons.evaicons.outline.Person
 import compose.icons.evaicons.outline.QuestionMarkCircle
 import compose.icons.evaicons.outline.Thermometer
+import dev.darkokoa.datetimewheelpicker.WheelDateTimePicker
+import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
+import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
 import hr.ferit.ltoprek.aqsense.components.inteface.main.SensorScreenComponent
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.BottomNavBarComponent
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.CalculateAqiDialogComponent
+import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.DateTimeFilterComponent
+import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.DateTimeFilterComponent.DateRangePreset
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.FilteringChipsComponent
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.SensorListComponent
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.TopAppBarComponent
@@ -83,6 +94,9 @@ import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.checkAqiRisk
 import hr.ferit.ltoprek.aqsense.utilities.Model
 import hr.ferit.ltoprek.aqsense.utilities.NavItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
 
 @Composable
@@ -91,6 +105,7 @@ fun SensorScreenUi(component: SensorScreenComponent)
     val globalError by component.globalError.collectAsState(Dispatchers.Main.immediate)
     val data by component.sensors.subscribeAsState()
     val selectedCategory by component.selectedCategory.collectAsState(Dispatchers.Main.immediate)
+    val selectedDateRange by component.selectedDateRange.collectAsState(Dispatchers.Main.immediate)
     val inProgress by component.inProgress.collectAsState(Dispatchers.Main.immediate)
     val isCalculateAqiDialogVisible by component.isCalculateAqiDialogVisible.collectAsState(Dispatchers.Main.immediate)
 
@@ -116,6 +131,7 @@ fun SensorScreenUi(component: SensorScreenComponent)
                 CalculateAqiDialog(component.calculateAqiDialogComponent, data.sensors)
             }
             FilteringChipsUi(component.filteringChipsComponent, selectedCategory)
+            DateTimeFilterUi(component.dateTimeFilterComponent, selectedDateRange)
             if (inProgress) {
                 Box(modifier = Modifier.fillMaxSize())
                 {
@@ -123,7 +139,7 @@ fun SensorScreenUi(component: SensorScreenComponent)
                 }
             } else
             {
-                SensorListUi(component.sensorListComponent,data,globalError)
+                SensorListUi(component.sensorListComponent,data,globalError, component.calculateAqiDialogComponent.isDateRangeCalculationModeSet.value)
             }
         }
 
@@ -170,6 +186,144 @@ fun FilteringChipsUi(component: FilteringChipsComponent, selectedCategory: Senso
     }
 }
 
+@Composable
+fun DateTimeFilterUi(component: DateTimeFilterComponent, selectedDateRange: DateRangePreset?)
+{
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Date range:",
+                modifier = Modifier.align(Alignment.CenterVertically)
+            )
+            var expanded by remember { mutableStateOf(false) }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.CenterVertically)
+                    .padding(12.dp)
+                    .border(2.dp, MaterialTheme.colorScheme.primary)
+            ){
+                TextButton(
+                    onClick = { expanded = !expanded },
+                ){
+                    Text(
+                        text = selectedDateRange?.let{
+                            when(it){
+                                is DateRangePreset.Custom -> "Custom"
+                                DateRangePreset.LastDay -> "Last day"
+                                DateRangePreset.LastThreeDays -> "Last three days"
+                                DateRangePreset.LastWeek -> "Last week"
+                                DateRangePreset.LastMonth -> "Last month"
+                            }
+                        }?: "Select date range"
+                    )
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+
+                ){
+                    DropdownMenuItem(
+                        text = {Text("None")},
+                        onClick = {
+                            component.onDateTimeSelected(null)
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {Text("Last day")},
+                        onClick = {
+                            component.onDateTimeSelected(DateRangePreset.LastDay)
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {Text("Last three days")},
+                        onClick = {
+                            component.onDateTimeSelected(DateRangePreset.LastThreeDays)
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {Text("Last week")},
+                        onClick = {
+                            component.onDateTimeSelected(DateRangePreset.LastWeek)
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {Text("Last month")},
+                        onClick = {
+                            component.onDateTimeSelected(DateRangePreset.LastMonth)
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {Text("Custom date range")},
+                        onClick = {
+                            component.onDateTimeSelected(DateRangePreset.Custom(startDate = component.startDate.value, endDate = component.endDate.value))
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+        if(selectedDateRange is DateRangePreset.Custom) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row {
+                    Text("Start date:")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    WheelDateTimePicker(
+                        startDateTime = selectedDateRange.startDate.toLocalDateTime(TimeZone.currentSystemDefault()),
+                        timeFormatter = timeFormatter(timeFormat = TimeFormat.HOUR_24)
+                    ) { snappedDateTime ->
+
+                        component.onStartDateChanged(snappedDateTime.toInstant(TimeZone.Companion.currentSystemDefault()))
+                    }
+                }
+                Row {
+                    Text("End date:")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    WheelDateTimePicker(
+                        startDateTime = selectedDateRange.endDate.toLocalDateTime(TimeZone.currentSystemDefault()),
+                        timeFormatter = timeFormatter(timeFormat = TimeFormat.HOUR_24)
+                    ) { snappedDateTime ->
+                        component.onEndDateChanged(snappedDateTime.toInstant(TimeZone.Companion.currentSystemDefault()))
+                    }
+                }
+                Button(
+                    onClick = {
+                        try {
+                            component.onDateTimeSelected(
+                                DateRangePreset.Custom(
+                                    startDate = component.startDate.value,
+                                    endDate = component.endDate.value
+                                )
+                            )
+                        } catch(e: Exception){
+                            component.onErrorFeedback(e)
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Apply")
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopAppBarUi(component: TopAppBarComponent)
@@ -210,7 +364,7 @@ fun TopAppBarUi(component: TopAppBarComponent)
 }
 
 @Composable
-fun SensorListUi(component: SensorListComponent,data: Model, globalError: Exception?)
+fun SensorListUi(component: SensorListComponent,data: Model, globalError: Exception?, isDateRangeCalculationModeSet: Boolean)
 {
     Box(
         modifier = Modifier.fillMaxSize()
@@ -232,7 +386,8 @@ fun SensorListUi(component: SensorListComponent,data: Model, globalError: Except
                 items(data.sensors){ sensor ->
                     SensorListItem(
                         sensor = sensor,
-                        onClick = {component.onSensorClicked(sensor.id)}
+                        onClick = {component.onSensorClicked(sensor.id)},
+                        isDateRangeCalculationModeSet = isDateRangeCalculationModeSet
                     )
                 }
             }
@@ -241,7 +396,7 @@ fun SensorListUi(component: SensorListComponent,data: Model, globalError: Except
 }
 
 @Composable
-fun SensorListItem(sensor: Sensor, onClick: () -> Unit)
+fun SensorListItem(sensor: Sensor, onClick: () -> Unit, isDateRangeCalculationModeSet:Boolean)
 {
     Card(
         modifier = Modifier
@@ -269,7 +424,7 @@ fun SensorListItem(sensor: Sensor, onClick: () -> Unit)
             ) {
                 if(sensor.type == SensorType.CO || sensor.type == SensorType.CO2 || sensor.type == SensorType.VOC)
                 {
-                    ItemAqiReading(listOf(sensor))
+                    ItemAqiReading(listOf(sensor), isDateRangeCalculationModeSet)
                 } else if (sensor.type == SensorType.TEMPERATURE){
                     Box(
                         modifier = Modifier
@@ -325,9 +480,9 @@ fun SensorListItem(sensor: Sensor, onClick: () -> Unit)
 }
 
 @Composable
-fun ItemAqiReading(sensors: List<Sensor>)
+fun ItemAqiReading(sensors: List<Sensor>, isDateRangeCalculationModeSet: Boolean)
 {
-    val aqiValue = AqiCalculator.calculateAqi(sensors)
+    val aqiValue = AqiCalculator.calculateAqi(sensors, isDateRangeCalculationModeSet)
     val aqiRisk = checkAqiRisk(aqiValue)
     Box(
         modifier = Modifier

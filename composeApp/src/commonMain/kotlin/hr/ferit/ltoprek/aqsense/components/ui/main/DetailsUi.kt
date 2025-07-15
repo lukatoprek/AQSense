@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +59,7 @@ import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.GraphComponent
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.SensorMapComponent
 import hr.ferit.ltoprek.aqsense.models.SensorType
 import hr.ferit.ltoprek.aqsense.utilities.hourMinFormater
+import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.DateTimeFilterComponent.DateRangePreset
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.KoalaPlotTheme
 import io.github.koalaplot.core.style.LineStyle
@@ -69,15 +71,20 @@ import io.github.koalaplot.core.xygraph.XYGraph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsUi(component: SensorDetailsComponent) {
     val sensor by component.sensor.collectAsState(Dispatchers.Main.immediate)
-    val error by component.error.collectAsState(Dispatchers.Main.immediate)
+    val globalError by component.globalError.collectAsState(Dispatchers.Main.immediate)
     val graphComponent by component.graphComponent.collectAsState(Dispatchers.Main.immediate)
     val mapComponent by component.mapComponent.collectAsState(Dispatchers.Main.immediate)
     val inProgress by component.inProgress.collectAsState(Dispatchers.Main.immediate)
+    val selectedDateRange by component.selectedDateRange.collectAsState(Dispatchers.Main.immediate)
 
     val isDialogOpen = remember { mutableStateOf(false) }
 
@@ -133,7 +140,7 @@ fun DetailsUi(component: SensorDetailsComponent) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("No data available", Modifier.align(Alignment.CenterHorizontally))
-                    error?.let {
+                    globalError?.let {
                         Text(
                             text = it.message ?: "Unknown error",
                             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -141,7 +148,6 @@ fun DetailsUi(component: SensorDetailsComponent) {
                     }
                 }
             }
-
         } else {
             Column(
                 modifier = Modifier
@@ -183,7 +189,7 @@ fun DetailsUi(component: SensorDetailsComponent) {
                             Text(
                                 text = "No data available",
                             )
-                            error?.let {
+                            globalError?.let {
                                 Text(
                                     text = it.message ?: "Unknown error",
                                 )
@@ -191,6 +197,9 @@ fun DetailsUi(component: SensorDetailsComponent) {
                         }
                     }
                 }
+
+                DateTimeFilterUi(component.dateTimeFilterComponent, selectedDateRange)
+
                 Text(
                     "Sensor name: ${sensor?.name}",
                     modifier = Modifier
@@ -242,7 +251,7 @@ fun DetailsUi(component: SensorDetailsComponent) {
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     if (sensor?.type == SensorType.VOC || sensor?.type == SensorType.CO || sensor?.type == SensorType.CO2) {
-                        ItemAqiReading(listOf(sensor!!))
+                        ItemAqiReading(listOf(sensor!!), selectedDateRange is DateRangePreset.Custom)
                     } else if (sensor?.type == SensorType.TEMPERATURE) {
                         Box(
                             modifier = Modifier
@@ -292,6 +301,48 @@ fun DetailsUi(component: SensorDetailsComponent) {
 @Composable
 fun GraphUi(component: GraphComponent)
 {
+    val sensorTimes  = component.getSensorTimes()
+
+    val showLabelIndices = remember(sensorTimes) {
+        if (sensorTimes.size <= 1) return@remember emptySet<Int>()
+
+        val visibleIndices = mutableSetOf(0, sensorTimes.lastIndex)
+        var lastVisibleTimeIndex = 0
+
+        val totalDuration = sensorTimes.last() - sensorTimes.first()
+        val minTimeGap = when{
+            totalDuration > 30.days -> 7.days
+            totalDuration > 15.days -> 3.days
+            totalDuration > 7.days -> 1.days
+            totalDuration > 3.days -> 12.hours
+            totalDuration > 1.days -> 6.hours
+            totalDuration > 12.hours -> 3.hours
+            totalDuration > 6.hours -> 1.hours
+            totalDuration > 2.hours -> 30.minutes
+            totalDuration > 45.minutes -> 15.minutes
+            else -> 5.minutes
+        }
+
+        for (i in 1 until sensorTimes.lastIndex) {
+            val timeElapsedSinceLastLabel = sensorTimes[i] - sensorTimes[lastVisibleTimeIndex]
+
+            if (timeElapsedSinceLastLabel >= minTimeGap-1.minutes) { // 1.minutes represents the tolerance for errors introduced from conversion of Firestore Timestamp to Instant
+                visibleIndices.add(i)
+                lastVisibleTimeIndex = i
+            }
+        }
+        visibleIndices
+    }
+
+    val visibleCategories = remember(showLabelIndices, sensorTimes) {
+        showLabelIndices.map { sensorTimes[it] }.toSet()
+    }
+
+    val labelStep =
+        if(visibleCategories.size > 10)
+            (visibleCategories.size/5.0).roundToInt()
+        else 1
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -317,26 +368,30 @@ fun GraphUi(component: GraphComponent)
                         .align(Alignment.Center))
             },
             xAxisLabels = { time ->
-                val localDateTime = time.toLocalDateTime(TimeZone.currentSystemDefault())
-
-
-
-                val formatedDate = "${localDateTime.dayOfMonth}.${localDateTime.monthNumber}."
-                val formatedTime = "\n${hourMinFormater(localDateTime.hour)}:${hourMinFormater(localDateTime.minute)}"
-                Column(
-                    verticalArrangement = Arrangement.spacedBy((-40).dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = formatedDate,
-                        fontSize = 8.sp,
-                    )
-                    Text(
-                        text = formatedTime,
-                        fontSize = 8.sp,
-                    )
+                if(time in visibleCategories)
+                {
+                    val index = sensorTimes.indexOf(time)
+                    if (index % labelStep == 0 || index == sensorTimes.size - 1) {
+                        val localDateTime = time.toLocalDateTime(TimeZone.currentSystemDefault())
+                        val formatedDate = "${localDateTime.dayOfMonth}.${localDateTime.monthNumber}."
+                        val formatedTime = "\n${hourMinFormater(localDateTime.hour)}:${hourMinFormater(localDateTime.minute)}"
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy((-40).dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = formatedDate,
+                                fontSize = 8.sp,
+                            )
+                            Text(
+                                text = formatedTime,
+                                fontSize = 8.sp,
+                            )
+                        }
+                    }
+                } else {
+                    Box(Modifier.size(0.dp))
                 }
-
             },
             yAxisLabels = { value ->
                 Text(value.toString(), fontSize = 12.sp)
