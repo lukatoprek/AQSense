@@ -18,5 +18,4 @@ class RealSensorListComponent(
     override fun onSensorClicked(sensorId: String) {
         onSensorClickedFeedback(sensorId)
     }
-
 }

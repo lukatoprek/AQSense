@@ -9,11 +9,8 @@ import hr.ferit.ltoprek.aqsense.models.SharedAuthorizationRepository
 import hr.ferit.ltoprek.aqsense.models.SharedSensorRepository
 
 val lifecycle = LifecycleRegistry()
-
 val authorizationRepository = SharedAuthorizationRepository()
 val sensorRepository = SharedSensorRepository()
-
-
 
 fun MainViewController() = ComposeUIViewController {
     val root = remember {

@@ -5,5 +5,5 @@ interface SensorRepository {
 
     suspend fun getSensorById(id: String): Sensor?
 
-    suspend fun deleteSensor(sensorId: String)
+    suspend fun deleteSensor(id: String)
 }

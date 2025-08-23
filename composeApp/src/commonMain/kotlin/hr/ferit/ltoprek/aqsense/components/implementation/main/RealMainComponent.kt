@@ -40,8 +40,8 @@ class RealMainComponent(
         is ChildConfig.SensorScreen -> {
             MainComponent.Child.SensorScreen(
                 RealSensorScreenComponent(
-                    componentContext,
-                    sensorRepository,
+                    componentContext = componentContext,
+                    sensorRepository = sensorRepository,
                     onSensorClickedFeedback = { sensorId ->
                         navigation.pushNew(ChildConfig.DetailsScreen(sensorId))
                     },

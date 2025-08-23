@@ -7,13 +7,6 @@ import kotlinx.datetime.Instant
 
 enum class NavItem { PROFILE, HOME, MAP }
 
-object TimestampConverter
-{
-    fun Timestamp.toKotlinInstant(): Instant = this.let {
-        Instant.fromEpochSeconds(it.seconds, it.nanoseconds.toLong())
-    }
-}
-
 object AqiCalculator
 {
     private const val CO_MIN = 0
@@ -75,7 +68,7 @@ object AqiCalculator
                 }
                 PRIMARY_POLLUTANT_WEIGHT * coIndex + (1 - PRIMARY_POLLUTANT_WEIGHT) * nonCOIndex
             }
-            else -> throw IllegalStateException("Cannot calculate AQI with the provided sensor data. Insufficient sensor types (CO, VOC, CO2).")
+            else -> 0.0
         }
     }
 
@@ -114,6 +107,13 @@ data class MeasurementTimestamp(
     val value: Double = 0.0,
     val time: Instant = Instant.fromEpochMilliseconds(0)
 )
+
+object TimestampConverter
+{
+    fun Timestamp.toKotlinInstant(): Instant = this.let {
+        Instant.fromEpochSeconds(it.seconds, it.nanoseconds.toLong())
+    }
+}
 
 class RegistrationData(
     val name: String? = null,

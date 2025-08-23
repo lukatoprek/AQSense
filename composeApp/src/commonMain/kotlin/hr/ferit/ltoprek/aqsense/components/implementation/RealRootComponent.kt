@@ -72,7 +72,7 @@ class RealRootComponent(
         is ChildConfig.Authorization -> {
             RootComponent.Child.Authorization(
                 RealAuthorizationComponent(
-                    componentContext,
+                    componentContext = componentContext,
                     onAuthorizationFinished = {
                         user -> _currentUser.value = user
                         navigation.replaceAll(ChildConfig.Main)
@@ -85,7 +85,7 @@ class RealRootComponent(
         is ChildConfig.Main -> {
             RootComponent.Child.Main(
                 RealMainComponent(
-                    componentContext,
+                    componentContext = componentContext,
                     currentUser = currentUser,
                     authorizationRepository = authorizationRepository,
                     sensorRepository = sensorRepository,

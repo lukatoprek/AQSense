@@ -36,7 +36,7 @@ class RealAuthorizationComponent(
         is ChildConfig.Login -> {
             AuthorizationComponent.Child.Login(
                 RealLoginComponent(
-                    componentContext,
+                    componentContext = componentContext,
                     onAuthorizationSuccess = { user -> onAuthorizationFinished(user) },
                     onRegistrationSwitch = { navigation.replaceAll(ChildConfig.Registration) },
                     authorizationRepository = this.authorizationRepository
@@ -47,7 +47,7 @@ class RealAuthorizationComponent(
         is ChildConfig.Registration ->{
             AuthorizationComponent.Child.Registration(
                 RealRegistrationComponent(
-                    componentContext,
+                    componentContext = componentContext,
                     onAuthorizationSuccess = { user -> onAuthorizationFinished(user) },
                     onLoginSwitch = { navigation.replaceAll(ChildConfig.Login) },
                     authorizationRepository = this.authorizationRepository

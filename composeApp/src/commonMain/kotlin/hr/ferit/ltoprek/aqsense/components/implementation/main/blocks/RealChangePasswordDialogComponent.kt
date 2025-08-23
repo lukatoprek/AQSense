@@ -50,7 +50,7 @@ class RealChangePasswordDialogComponent(
     override fun getUserEmail(): String{
         var name = "sample@aqsense.com"
         componentScope.launch {
-            name = authorizationRepository.getCurrentUser()?.email?:"sample@email.com"
+            name = authorizationRepository.getCurrentUser()?.email?:"sample@aqsense.com"
         }
         return name
     }

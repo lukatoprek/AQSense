@@ -82,7 +82,5 @@ class RealRegistrationComponent(
         }
     }
 
-    override fun onLoginClick() {
-        onLoginSwitch()
-    }
+    override fun onLoginClick() { onLoginSwitch() }
 }

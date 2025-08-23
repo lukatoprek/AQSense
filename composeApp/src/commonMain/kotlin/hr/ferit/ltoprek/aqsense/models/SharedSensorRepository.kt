@@ -106,13 +106,13 @@ class SharedSensorRepository : SensorRepository
         }
     }
 
-    override suspend fun deleteSensor(sensorId: String) {
+    override suspend fun deleteSensor(id: String) {
         try {
             firestore.collection("sensors")
-                .document(sensorId)
+                .document(id)
                 .delete()
         } catch(e: Exception){
-            throw SensorMutationException("Failed to delete sensor $sensorId", e)
+            throw SensorMutationException("Failed to delete sensor $id", e)
         }
     }
 }
