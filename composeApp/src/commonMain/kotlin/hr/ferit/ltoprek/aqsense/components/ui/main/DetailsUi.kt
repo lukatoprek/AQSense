@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,6 +61,7 @@ import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.SensorMapCompone
 import hr.ferit.ltoprek.aqsense.models.SensorType
 import hr.ferit.ltoprek.aqsense.utilities.hourMinFormater
 import hr.ferit.ltoprek.aqsense.components.inteface.main.blocks.DateTimeFilterComponent.DateRangePreset
+import hr.ferit.ltoprek.aqsense.utilities.isPollutant
 import io.github.koalaplot.core.line.LinePlot
 import io.github.koalaplot.core.style.KoalaPlotTheme
 import io.github.koalaplot.core.style.LineStyle
@@ -230,7 +232,7 @@ fun DetailsUi(component: SensorDetailsComponent) {
                         SensorInfoRow(label = "Longitude", value = coords.longitude.toString())
                     }
 
-                    if (sensor?.type == SensorType.VOC || sensor?.type == SensorType.CO || sensor?.type == SensorType.CO2) {
+                    if (isPollutant(sensor?.type)) {
                         Text(
                             "Air Quality Index",
                             style = MaterialTheme.typography.titleMedium.copy(
@@ -250,7 +252,7 @@ fun DetailsUi(component: SensorDetailsComponent) {
                         .align(Alignment.CenterHorizontally),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    if (sensor?.type == SensorType.VOC || sensor?.type == SensorType.CO || sensor?.type == SensorType.CO2) {
+                    if (isPollutant(sensor?.type)) {
                         ItemAqiReading(listOf(sensor!!), selectedDateRange is DateRangePreset.Custom)
                     } else if (sensor?.type == SensorType.TEMPERATURE) {
                         Box(
@@ -353,7 +355,12 @@ fun GraphUi(component: GraphComponent)
                 .fillMaxSize()
                 .padding(20.dp),
             xAxisModel = CategoryAxisModel(component.getSensorTimes()),
-            yAxisModel = DoubleLinearAxisModel(component.getSensorValueRange()),
+            yAxisModel = DoubleLinearAxisModel(
+                range = component.getSensorValueRange(),
+                minimumMajorTickIncrement = 0.01,
+                minimumMajorTickSpacing = 30.dp,
+                minorTickCount = 2
+                ),
             xAxisTitle = {
                 Text("Time",
                     modifier = Modifier
@@ -390,7 +397,7 @@ fun GraphUi(component: GraphComponent)
                         }
                     }
                 } else {
-                    Box(Modifier.size(0.dp))
+                    Spacer(Modifier.size(0.dp))
                 }
             },
             yAxisLabels = { value ->

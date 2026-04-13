@@ -7,101 +7,150 @@ import kotlinx.datetime.Instant
 
 enum class NavItem { PROFILE, HOME, MAP }
 
-object AqiCalculator
-{
-    private const val CO_MIN = 0
-    private const val CO_MAX = 50
-    private const val CO2_MIN = 0
-    private const val CO2_MAX = 2000
-    private const val VOC_MIN = 0
-    private const val VOC_MAX = 1000
-    private const val PRIMARY_POLLUTANT_WEIGHT = 0.5
+object AqiCalculator {
 
-    private fun getAverageMeasurement(sensors: List<Sensor>, targetType: SensorType, isDateRangeCalculationModeSet: Boolean): Double?
-    {
-        val relevantSensors = sensors.filter { it.type == targetType }
-        if(isDateRangeCalculationModeSet)
-        {
-            if (relevantSensors.isEmpty()) return null
-            val allMeasurements = relevantSensors.flatMap { it.measurements.map { m -> m.value } }
-            return if (allMeasurements.isNotEmpty()) allMeasurements.average() else null
-        }
-        else
-        {
-            if (relevantSensors.isEmpty()) return null
-            return relevantSensors.map { it.measurements.lastOrNull()?.value ?: 0.0 }.average()
+    private data class Breakpoint(
+        val cLow: Double,
+        val cHigh: Double,
+        val iLow: Double,
+        val iHigh: Double
+    )
+
+    // Concentration -> AQI breakpoints, per pollutant.
+    private val breakpoints: Map<SensorType, List<Breakpoint>> = mapOf(
+        // CO (ppm, 8-hour) — EPA
+        SensorType.CO to listOf(
+            Breakpoint(0.0,   4.4,   0.0,  50.0),
+            Breakpoint(4.5,   9.4,  51.0, 100.0),
+            Breakpoint(9.5,  12.4, 101.0, 150.0),
+            Breakpoint(12.5, 15.4, 151.0, 200.0),
+            Breakpoint(15.5, 30.4, 201.0, 300.0),
+            Breakpoint(30.5, 50.4, 301.0, 500.0)
+        ),
+        // CO2 (ppm) — indoor-air guidance, not EPA
+        SensorType.CO2 to listOf(
+            Breakpoint(   0.0,  600.0,   0.0,  50.0),
+            Breakpoint( 601.0, 1000.0,  51.0, 100.0),
+            Breakpoint(1001.0, 1500.0, 101.0, 150.0),
+            Breakpoint(1501.0, 2000.0, 151.0, 200.0),
+            Breakpoint(2001.0, 5000.0, 201.0, 300.0)
+        ),
+        // VOC — Sensirion VOC Index (1..500, 100 = typical)
+        SensorType.VOC to listOf(
+            Breakpoint(  0.0, 100.0,   0.0,  50.0),
+            Breakpoint(101.0, 200.0,  51.0, 100.0),
+            Breakpoint(201.0, 300.0, 101.0, 150.0),
+            Breakpoint(301.0, 400.0, 151.0, 200.0),
+            Breakpoint(401.0, 500.0, 201.0, 300.0)
+        ),
+        // NOx — Sensirion NOx Index (1..500, 100 = typical)
+        SensorType.NOX to listOf(
+            Breakpoint(  0.0, 100.0,   0.0,  50.0),
+            Breakpoint(101.0, 200.0,  51.0, 100.0),
+            Breakpoint(201.0, 300.0, 101.0, 150.0),
+            Breakpoint(301.0, 400.0, 151.0, 200.0),
+            Breakpoint(401.0, 500.0, 201.0, 300.0)
+        ),
+        // PM1 (µg/m³) — no official EPA table; mirrors PM2.5
+        SensorType.PM1 to listOf(
+            Breakpoint(  0.0,  12.0,   0.0,  50.0),
+            Breakpoint( 12.1,  35.4,  51.0, 100.0),
+            Breakpoint( 35.5,  55.4, 101.0, 150.0),
+            Breakpoint( 55.5, 150.4, 151.0, 200.0),
+            Breakpoint(150.5, 250.4, 201.0, 300.0),
+            Breakpoint(250.5, 500.4, 301.0, 500.0)
+        ),
+        // PM2.5 (µg/m³, 24-hour) — EPA
+        SensorType.PM2_5 to listOf(
+            Breakpoint(  0.0,  12.0,   0.0,  50.0),
+            Breakpoint( 12.1,  35.4,  51.0, 100.0),
+            Breakpoint( 35.5,  55.4, 101.0, 150.0),
+            Breakpoint( 55.5, 150.4, 151.0, 200.0),
+            Breakpoint(150.5, 250.4, 201.0, 300.0),
+            Breakpoint(250.5, 500.4, 301.0, 500.0)
+        ),
+        // PM10 (µg/m³, 24-hour) — EPA
+        SensorType.PM10 to listOf(
+            Breakpoint(  0.0,  54.0,   0.0,  50.0),
+            Breakpoint( 55.0, 154.0,  51.0, 100.0),
+            Breakpoint(155.0, 254.0, 101.0, 150.0),
+            Breakpoint(255.0, 354.0, 151.0, 200.0),
+            Breakpoint(355.0, 424.0, 201.0, 300.0),
+            Breakpoint(425.0, 604.0, 301.0, 500.0)
+        )
+    )
+
+    val aqiPollutants: Set<SensorType> = breakpoints.keys
+
+    private fun getAverageMeasurement(
+        sensors: List<Sensor>,
+        targetType: SensorType,
+        isDateRangeCalculationModeSet: Boolean
+    ): Double? {
+        val relevant = sensors.filter { it.type == targetType }
+        if (relevant.isEmpty()) return null
+
+        return if (isDateRangeCalculationModeSet) {
+            val all = relevant.flatMap { s -> s.measurements.map { it.value } }
+            if (all.isNotEmpty()) all.average() else null
+        } else {
+            val latest = relevant.mapNotNull { it.measurements.lastOrNull()?.value }
+            if (latest.isNotEmpty()) latest.average() else null
         }
     }
+
+    private fun calculateSubIndex(type: SensorType, value: Double): Double? {
+        val bps = breakpoints[type] ?: return null
+        if (value <= 0.0) return 0.0
+
+        val top = bps.last()
+        if (value > top.cHigh) return top.iHigh
+
+        val bp = bps.firstOrNull { value in it.cLow..it.cHigh } ?: return null
+        return ((bp.iHigh - bp.iLow) / (bp.cHigh - bp.cLow)) * (value - bp.cLow) + bp.iLow
+    }
+
+    fun calculatePollutantAqi(
+        sensors: List<Sensor>,
+        type: SensorType,
+        isDateRangeCalculationModeSet: Boolean
+    ): Double? {
+        val avg = getAverageMeasurement(sensors, type, isDateRangeCalculationModeSet) ?: return null
+        return calculateSubIndex(type, avg)
+    }
+
+    fun calculateAllSubIndices(
+        sensors: List<Sensor>,
+        isDateRangeCalculationModeSet: Boolean
+    ): Map<SensorType, Double> =
+        aqiPollutants.mapNotNull { type ->
+            calculatePollutantAqi(sensors, type, isDateRangeCalculationModeSet)?.let { type to it }
+        }.toMap()
 
     fun calculateAqi(sensors: List<Sensor>, isDateRangeCalculationModeSet: Boolean): Double {
         if (sensors.isEmpty()) {
             throw IllegalArgumentException("Cannot calculate AQI with an empty list of sensors.")
         }
-
-        val avgCO = getAverageMeasurement(sensors, SensorType.CO, isDateRangeCalculationModeSet)
-        val avgVOC = getAverageMeasurement(sensors, SensorType.VOC, isDateRangeCalculationModeSet)
-        val avgCO2 = getAverageMeasurement(sensors, SensorType.CO2, isDateRangeCalculationModeSet)
-
-        val coIndex = avgCO?.let { calculateCOIndex(it) }
-        val vocIndex = avgVOC?.let { calculateVOCIndex(it) }
-        val co2Index = avgCO2?.let { calculateCO2Index(it) }
-
-        return when {
-            coIndex != null && vocIndex == null && co2Index == null -> coIndex
-
-            coIndex == null && (vocIndex != null || co2Index != null) -> {
-                val primary = vocIndex ?: 0.0
-                val secondary = co2Index ?: 0.0
-
-                val vocWeight = if (vocIndex != null && co2Index != null) PRIMARY_POLLUTANT_WEIGHT else if (vocIndex != null) 1.0 else 0.0
-                val co2Weight = if (vocIndex != null && co2Index != null) (1 - PRIMARY_POLLUTANT_WEIGHT) else if (co2Index != null) 1.0 else 0.0
-
-                vocWeight * primary + co2Weight * secondary
-            }
-
-            coIndex != null && (vocIndex != null || co2Index != null) -> {
-                val nonCOIndex: Double = when {
-                    vocIndex != null && co2Index != null -> (vocIndex + co2Index)
-                    vocIndex != null -> vocIndex
-                    co2Index != null -> co2Index
-                    else -> 0.0
-                }
-                PRIMARY_POLLUTANT_WEIGHT * coIndex + (1 - PRIMARY_POLLUTANT_WEIGHT) * nonCOIndex
-            }
-            else -> 0.0
-        }
+        val subs = calculateAllSubIndices(sensors, isDateRangeCalculationModeSet)
+        return subs.values.maxOrNull() ?: 0.0
     }
 
-    private fun calculateCOIndex(value: Double): Double {
-        return ((value-CO_MIN)/(CO_MAX-CO_MIN))*300
-    }
-    private fun calculateCO2Index(value: Double): Double {
-        return ((value-CO2_MIN)/(CO2_MAX-CO2_MIN))*300
-    }
-    private fun calculateVOCIndex(value: Double): Double {
-        return ((value-VOC_MIN)/(VOC_MAX-VOC_MIN))*300
-    }
+    enum class AqiRisk { GOOD, MODERATE, UNHEALTHY }
 
-    enum class AqiRisk{
-        GOOD,
-        MODERATE,
-        UNHEALTHY,
-    }
-
-    object AqiRiskWarning{
+    object AqiRiskWarning {
         const val GOOD = "Air quality is satisfactory, and air pollution poses little or no risk."
         const val MODERATE = "Members of sensitive groups may experience health effects and should limit or avoid outdoor activities."
         const val UNHEALTHY = "Health alert! The risk of health effects is increased and everyone should avoid all outdoor activities."
     }
 
-    fun checkAqiRisk(aqi: Double): AqiRisk{
-        return when(aqi){
-            in 0.0..50.0 -> AqiRisk.GOOD
-            in 51.0..150.0 -> AqiRisk.MODERATE
-            else -> AqiRisk.UNHEALTHY
-        }
+    fun checkAqiRisk(aqi: Double): AqiRisk = when {
+        aqi <= 50.0  -> AqiRisk.GOOD
+        aqi <= 150.0 -> AqiRisk.MODERATE
+        else         -> AqiRisk.UNHEALTHY
     }
 }
+
+fun isPollutant(type: SensorType?): Boolean = AqiCalculator.aqiPollutants.contains(type)
 
 data class MeasurementTimestamp(
     val value: Double = 0.0,

@@ -42,6 +42,7 @@ kotlin {
                 implementation(libs.maplibre.compose)
                 implementation(libs.eva.icons)
                 implementation(libs.datetime.wheel.picker)
+                implementation(libs.mp.stools)
                 api(libs.kmpnotifier)
             }
         }

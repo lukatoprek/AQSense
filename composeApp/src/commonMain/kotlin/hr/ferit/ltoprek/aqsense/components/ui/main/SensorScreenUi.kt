@@ -66,6 +66,7 @@ import compose.icons.evaicons.outline.Bulb
 import compose.icons.evaicons.outline.Droplet
 import compose.icons.evaicons.outline.Globe2
 import compose.icons.evaicons.outline.Home
+import compose.icons.evaicons.outline.Loader
 import compose.icons.evaicons.outline.Menu
 import compose.icons.evaicons.outline.MinusCircle
 import compose.icons.evaicons.outline.PauseCircle
@@ -93,6 +94,7 @@ import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator
 import hr.ferit.ltoprek.aqsense.utilities.AqiCalculator.checkAqiRisk
 import hr.ferit.ltoprek.aqsense.utilities.Model
 import hr.ferit.ltoprek.aqsense.utilities.NavItem
+import hr.ferit.ltoprek.aqsense.utilities.isPollutant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -158,6 +160,10 @@ fun FilteringChipsUi(component: FilteringChipsComponent, selectedCategory: Senso
             SensorType.CO to Pair("CO", EvaIcons.Outline.MinusCircle),
             SensorType.CO2 to Pair("CO2", EvaIcons.Outline.PauseCircle),
             SensorType.VOC to Pair("VOC", EvaIcons.Outline.Percent),
+            SensorType.NOX to Pair("NOX", EvaIcons.Outline.Percent),
+            SensorType.PM1 to Pair("PM1", EvaIcons.Outline.Loader),
+            SensorType.PM2_5 to Pair("PM2.5", EvaIcons.Outline.Loader),
+            SensorType.PM10 to Pair("PM10", EvaIcons.Outline.Loader),
             SensorType.UNKNOWN to Pair("Unknown", EvaIcons.Outline.QuestionMarkCircle)
         )
     }
@@ -422,7 +428,7 @@ fun SensorListItem(sensor: Sensor, onClick: () -> Unit, isDateRangeCalculationMo
                     .padding(5.dp),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                if(sensor.type == SensorType.CO || sensor.type == SensorType.CO2 || sensor.type == SensorType.VOC)
+                if(isPollutant(sensor.type))
                 {
                     ItemAqiReading(listOf(sensor), isDateRangeCalculationModeSet)
                 } else if (sensor.type == SensorType.TEMPERATURE){
@@ -557,7 +563,7 @@ fun CalculateAqiDialog(component: CalculateAqiDialogComponent, sensors: List<Sen
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    sensors.filter { it.type == SensorType.CO || it.type == SensorType.CO2 || it.type == SensorType.VOC }.forEach { sensor ->
+                    sensors.filter { isPollutant(it.type) }.forEach { sensor ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
